@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DAPI BigR</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>  
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <script src="https://cdn.dapi.com/dapi/v2/sdk.js"></script>
+</head>
+<body>
+    <section class="container my-5">
+        <div class="card">
+            <div class="card-header">
+                <div class="row justify-content-center">
+                    <div class="col-md-6 text-center">
+                        <button type="button" class="btn btn-primary" id="dapiOn">Dapi Login</button>
+                        <div id="ClientLogged" style="display: none;">
+                            <button type="button" class="btn btn-danger mr-2" id="dapiOff">Dapi Logout</button>
+                            <button type="button" class="btn btn-info" onclick="getIntervalTransactions();" id="transactionsShow">Show transactions</button>
+                        </div>
+                        
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <table class="table table-striped" width="100%">
+                    <thead>
+                        <tr>
+                            <th width="5%">Sl#</th>
+                            <th width="10%">Date</th>
+                            <th width="40%">Description</th>
+                            <th width="10%">Reference</th>
+                            <th width="15%">Dr/Cr</th>
+                            <th width="20%">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transData">
+                        
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+    <script>
+        var ba = null;
+        var accountID = null;
+        var handler = Dapi.create({
+            environment: Dapi.environments.sandbox, //or .production
+            appKey: "4e1c41d5e6edafdf705b790d7e37e4d43731562b35abcf15eb62312f8bb3b456", 
+            countries: ["AE"],
+            bundleID: "com.bigr", // bundleID you set on Dashboard
+            clientUserID: "1",  
+            isCachedEnabled: true,
+            isExperimental: false,
+            clientHeaders: {},
+            clientBody: {},
+            onSuccessfulLogin: function(bankAccount) {
+                $('#dapiOn').hide();
+                $('#ClientLogged').show();
+                ba = bankAccount;
+                console.log(ba)
+                // To get acoutn details
+                ba.data.getAccounts().then(payload => {
+                    ba.showAccountsModal(
+                    "Your account details",
+                    payload.accounts,
+                    (account) => {
+                        accountID = account.id;
+                        console.dir(account)
+                    },
+                    () => {
+                        console.dir("User Cancelled")
+                    })
+                })
+                // getIntervalTransactions();
+            },
+            onFailedLogin: function(err) {
+                if (err != null) {
+                    console.log("Error");
+                    console.log(err);
+                } else {
+                    console.log("No error");
+                }
+            },
+            onReady: function() {
+                alert('Dapi is ready')
+                // handler.open(); // opens the Connect widget
+            },
+            onExit: function() {
+                console.log("User exited the flow")
+            },
+            onAuthModalOpen: function() {
+                console.log("MFA modal opened")
+            },
+            onAuthModalSubmit: function() {
+                console.log("MFA answer submitted")
+            }
+        });
+
+        $('#dapiOn').on('click', () => {
+            handler.open();
+        });
+        $('#dapiOff').on('click', () => {
+            window.location.reload();
+            // ba = null;
+            // handler.open();
+        })
+
+        function getIntervalTransactions(start_date=null, end_date=null){
+            if(ba){
+                if(start_date === null && end_date === null){
+                    end_date = moment();
+                    start_date = moment().startOf('month').subtract(5, 'months');
+                }
+                console.log(start_date.format('YYYY-MM-DD'), end_date)
+                ba.data.getTransactions(accountID, start_date.format('YYYY-MM-DD'), end_date.format('YYYY-MM-DD')).then(transactionsResponse => {
+                    if(transactionsResponse.status === "done") {
+                        let transHtml = '';
+                        console.dir(transactionsResponse.transactions)
+                        transactionsResponse.transactions.map((item, i) => {
+                            transHtml += '<tr>\
+                                    <td>'+(i+1)+'</td>\
+                                    <td>'+moment(item.date).format('DD-MM-YYYY hh:mm a')+'</td>\
+                                    <td>'+item.description+'<br>'+item.details+'</td>\
+                                    <td>'+item.reference+'</td>\
+                                    <td>'+(item.type).toUpperCase()+'</td>\
+                                    <td>'+Number(item.amount).toLocaleString('en-AE', {style: 'currency', currency: item.currency.code})+'</td>\
+                                    </tr>'
+                        })
+                        $('#transData').html(transHtml);
+                    } else {
+                        console.error("API Responded with an error")
+                        console.dir(transactionsResponse)
+                    }
+                })
+                .catch(error => {
+                    console.dir(error)
+                })
+            }else{
+                alert('First login in to your Dapi account')
+            }
+        }
+    </script>
+</body>
+</html>
