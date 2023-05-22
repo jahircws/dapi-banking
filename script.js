@@ -12,7 +12,6 @@ var handler = Dapi.create({
     clientBody: {},
     onSuccessfulLogin: function(bankAccount) {
         $('#dapiOn').hide();
-        
         ba = bankAccount;
         console.log(ba)
         // To get acoutn details
